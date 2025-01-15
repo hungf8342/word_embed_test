@@ -8,16 +8,19 @@ date: "2025-01-14"
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(wordVectors)
+
+proj_path <- "C:/Users/Frances/Documents/Projects/Comp Linguistics/Projects/word_embed_test"
 ```
+
+# 2024 NOW data
 
 ## Read-In
 
 We start by reading in the small corpus sample from 2024. Our features of interest are "real-time," "language," "hired," and "translate." Each of these shows up multiple times even in the limited corpus we use. 
 
 
-
 ```{r read-in}
-prep_word2vec(origin="../0-data", destination="sample.txt", lowercase = T, bundle_ngrams=2)
+prep_word2vec(origin=paste0(proj_path,"/0-data"), destination="sample.txt", lowercase = T, bundle_ngrams=2)
 ```
 
 ## Take a Look
@@ -42,25 +45,61 @@ close(con)
 # fixing the "real time" term
 fixed_string <- long_string %>% str_replace_all("real\\stime", "real_time")
 realm <- str_extract_all(fixed_string, "real_time")
-write(fixed_string, "sample.txt")
+write(fixed_string, "sample-fixed.txt")
 
 #-------------------------
 # create word embedding
 #-------------------------
 if (!file.exists("sample_vectors.bin")) {
-  model = train_word2vec("sample.txt","sample_vectors.bin",vectors=150,
-                         threads=4,window=12,iter=5,negative_samples=0)} else model = read.vectors("sample_vectors.bin")
+  model = train_word2vec("sample-fixed.txt","sample_vectors.bin",vectors=150,
+                         threads=4,window=12,iter=5,negative_samples=0)} else model = read.vectors("C:/Users/Frances/Documents/Projects/Comp Linguistics/Projects/word_embed_test/1-scripts/sample_vectors.bin")
 ```
 
 We can calculate or plot the proportion of times a word of interest shows up in the corpus.
 
-# Analysis
+## Exploration
+
+We can see the top words associated with "interpreter." It seems like we'll need a more comprehensive database, since interpreter is most closely associated with baseball terms. In 2024, it doesn't seem to be an oft-used term in this NOW database sample.
+
+```{r top-words-interpreter, options}
+model %>%
+  closest_to("interpreter")
+```
+
+The closest words to our features appear more reasonable.
+
+```{r label, options}
+features = c("real_time", "languages", "hired", "translate")
+term_set = lapply(features, 
+       function(feature) {
+          nearest_words = model %>% closest_to(model[[feature]],20)
+          nearest_words$word
+        }) %>% unlist
+
+subset = model[[term_set,average=F]]
+
+subset %>%
+  cosineDist(subset) %>% 
+  as.dist %>%
+  hclust %>%
+  plot
+```
+
+## Analysis
 
 Because we are interested in how close "speech" and "writing" are to the four features that potentially define "interpreter," we calculate the cosine similarity between the categories of interest and each of the features. We store this as a matrix. 
 
 ```{r model-features, options}
-features = c("immediate", "languages", "hired", "translate")
+features = c("real_time", "different_languages", "hired", "translate")
 instances = c("speech", "writing")
+
+
+features_mat <- matrix(1:4, nrow=1)
+colnames(features_mat) <- features
+
+for(f in features) {
+  features_mat[1,f] <- cosineSimilarity(model[["interpreter"]], model[[f]])
+}
 
 similarity_mat <- matrix(1:8, nrow=2, ncol=4)
 rownames(similarity_mat) <- instances
@@ -72,7 +111,23 @@ for(f in features) {
   }
 }
 
+similarity_mat
 rowMeans(similarity_mat)
 
-model[str_detect(rownames(model), "real"),]
+#model[str_detect(rownames(model), "real"),]
+```
+
+# Pre-trained Stanford GLOVE Data
+
+```{r read-in-glove, options}
+library(textTinyR)
+
+# Specify the path to the GloVe file
+glove_path <- paste0(proj_path,"/2-glove/glove.840B.300d.txt") # Update to your GloVe file
+
+# Load the GloVe embeddings
+embeddings <- fread_glove_vecs(input_path = glove_path)
+
+# View the structure
+head(embeddings)
 ```
