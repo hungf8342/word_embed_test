@@ -90,7 +90,7 @@ subset %>%
 Because we are interested in how close "speech" and "writing" are to the four features that potentially define "interpreter," we calculate the cosine similarity between the categories of interest and each of the features. We store this as a matrix. 
 
 ```{r model-features, options}
-features = c("real_time", "different_languages", "hired", "translate")
+features = c("real_time", "languages", "hired", "translate")
 instances = c("speech", "writing")
 
 
@@ -119,18 +119,52 @@ rowMeans(similarity_mat)
 
 # Pre-trained Stanford GLOVE Data
 
+There is one term which is duplicated and one that is NA, according to warning messages. So I take the first to get rid of that duplicate which probably doesn't matter and get rid of the NA term.
+
 ```{r read-in-glove, options}
 library(data.table)
+library(lsa)
 
 # Specify the path to the GloVe file
 glove_path <- paste0(proj_path,"/2-glove/glove.840B.300d.txt") 
 # Load the GloVe embeddings
 glove_wts <- data.table::fread(glove_path, quote = "", sep=" ", data.table = FALSE) 
 
-# there is one term which is duplicated, according to warning messages. So I take the first to get rid of that duplicate which probably doesn't matter.
+# Removing NA and duplicate terms
 glove_wts_mat <- glove_wts[!duplicated(glove_wts$V1) & !is.na(glove_wts$V1),]
+rm(glove_wts)
 rownames(glove_wts_mat)<- glove_wts_mat$V1
+glove_wts_mat_fin <- glove_wts_mat[,-1] %>% as.matrix()
+rm(glove_wts_mat)
 
 # View the structure
-head(glove_wts)
+head(glove_wts_mat_fin)
+```
+
+
+We can now try to apply the same analysis as before. It seems a little better: we can see that "real-time" is closer to speech than writing, which makes sense. However, there still seems to be concern that we're not getting the right feature words, or that there is some dimensionality missing. Maybe a more exploratory approach first would help? I'm thinking PCA/LDA or even looking at the closest words. 
+
+```{r label, options}
+features = c("real-time", "languages", "hired", "translate")
+
+features_mat_glove <- matrix(1:4, nrow=1)
+colnames(features_mat_glove) <- features
+
+for(f in features) {
+  features_mat_glove[1,f] <- cosine(glove_wts_mat_fin["interpreter",], glove_wts_mat_fin[f,])
+}
+
+similarity_mat_glove <- matrix(1:8, nrow=2, ncol=4)
+rownames(similarity_mat_glove) <- instances
+colnames(similarity_mat_glove) <- features
+
+for(f in features) {
+  for(i in instances) {
+    similarity_mat_glove[i,f] <- cosine(glove_wts_mat_fin[i,], glove_wts_mat_fin[f,])
+  }
+}
+
+features_mat_glove
+similarity_mat_glove
+rowMeans(similarity_mat_glove)
 ```
