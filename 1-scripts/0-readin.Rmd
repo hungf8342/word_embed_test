@@ -120,14 +120,17 @@ rowMeans(similarity_mat)
 # Pre-trained Stanford GLOVE Data
 
 ```{r read-in-glove, options}
-library(textTinyR)
+library(data.table)
 
 # Specify the path to the GloVe file
-glove_path <- paste0(proj_path,"/2-glove/glove.840B.300d.txt") # Update to your GloVe file
-
+glove_path <- paste0(proj_path,"/2-glove/glove.840B.300d.txt") 
 # Load the GloVe embeddings
-embeddings <- fread_glove_vecs(input_path = glove_path)
+glove_wts <- data.table::fread(glove_path, quote = "", sep=" ", data.table = FALSE) 
+
+# there is one term which is duplicated, according to warning messages. So I take the first to get rid of that duplicate which probably doesn't matter.
+glove_wts_mat <- glove_wts[!duplicated(glove_wts$V1) & !is.na(glove_wts$V1),]
+rownames(glove_wts_mat)<- glove_wts_mat$V1
 
 # View the structure
-head(embeddings)
+head(glove_wts)
 ```
