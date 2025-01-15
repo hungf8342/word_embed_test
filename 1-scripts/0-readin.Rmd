@@ -1,0 +1,78 @@
+---
+title: "Read-in and Data Processing"
+output: html_document
+date: "2025-01-14"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(wordVectors)
+```
+
+## Read-In
+
+We start by reading in the small corpus sample from 2024. Our features of interest are "real-time," "language," "hired," and "translate." Each of these shows up multiple times even in the limited corpus we use. 
+
+
+
+```{r read-in}
+prep_word2vec(origin="../0-data", destination="sample.txt", lowercase = T, bundle_ngrams=2)
+```
+
+## Take a Look
+
+We create the word embedding model. 
+
+```{r pressure, echo=FALSE}
+#-------------------------
+# reading in text file
+#-------------------------
+file_path <- "sample.txt"
+
+# Open the file in binary mode
+con <- file(file_path, "r")
+
+# Read the entire file as a single string
+long_string <- readChar(con, file.info(file_path)$size)
+
+# Close the connection
+close(con)
+
+# fixing the "real time" term
+fixed_string <- long_string %>% str_replace_all("real\\stime", "real_time")
+realm <- str_extract_all(fixed_string, "real_time")
+write(fixed_string, "sample.txt")
+
+#-------------------------
+# create word embedding
+#-------------------------
+if (!file.exists("sample_vectors.bin")) {
+  model = train_word2vec("sample.txt","sample_vectors.bin",vectors=150,
+                         threads=4,window=12,iter=5,negative_samples=0)} else model = read.vectors("sample_vectors.bin")
+```
+
+We can calculate or plot the proportion of times a word of interest shows up in the corpus.
+
+# Analysis
+
+Because we are interested in how close "speech" and "writing" are to the four features that potentially define "interpreter," we calculate the cosine similarity between the categories of interest and each of the features. We store this as a matrix. 
+
+```{r model-features, options}
+features = c("immediate", "languages", "hired", "translate")
+instances = c("speech", "writing")
+
+similarity_mat <- matrix(1:8, nrow=2, ncol=4)
+rownames(similarity_mat) <- instances
+colnames(similarity_mat) <- features
+
+for(f in features) {
+  for(i in instances) {
+    similarity_mat[i,f] <- cosineSimilarity(model[[i]], model[[f]])
+  }
+}
+
+rowMeans(similarity_mat)
+
+model[str_detect(rownames(model), "real"),]
+```
